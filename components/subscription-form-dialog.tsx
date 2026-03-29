@@ -1,0 +1,535 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import type { Subscription } from "@/db/schema";
+import { BILLING_CYCLES, REMINDER_MODES, SUBSCRIPTION_STATUSES } from "@/db/schema";
+import { calcExpireDateFromStartDate, toDateInput } from "@/lib/subscription-utils";
+
+const formSchema = z.object({
+  name: z.string().min(1, "请输入名称"),
+  category: z.string().min(1, "请选择或输入分类"),
+  url: z.string().optional(),
+  notes: z.string().optional(),
+  cost: z.number().nonnegative().optional(),
+  currency: z.string().min(1),
+  billingCycle: z.enum(BILLING_CYCLES),
+  billingCycleCount: z.number().int().min(1),
+  autoRenew: z.boolean(),
+  startDate: z.string().optional(),
+  expireDate: z.string().min(1, "请选择到期日期"),
+  reminderDays: z.union([
+    z.literal(""),
+    z.number().int().min(0).max(365),
+  ]).refine((value) => value !== "", "请输入提醒天数"),
+  reminderMode: z.enum(REMINDER_MODES),
+  status: z.enum(SUBSCRIPTION_STATUSES),
+});
+
+type FormInput = z.input<typeof formSchema>;
+type FormOutput = z.output<typeof formSchema>;
+
+interface SubscriptionFormDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  subscription: Subscription | null;
+  onSuccess: (subscription: Subscription) => void;
+}
+
+const PRESET_CATEGORIES = [
+  { value: "domain", label: "域名" },
+  { value: "server", label: "服务器" },
+  { value: "streaming", label: "流媒体" },
+  { value: "software", label: "软件" },
+  { value: "saas", label: "SaaS" },
+  { value: "tool", label: "工具" },
+  { value: "other", label: "其他" },
+] as const;
+
+const STATUS_OPTIONS = [
+  { value: "active", label: "正常" },
+  { value: "paused", label: "暂停" },
+  { value: "disabled", label: "已停用" },
+  { value: "expired", label: "已过期" },
+] as const;
+
+const CURRENCY_OPTIONS = ["CNY", "USD", "EUR", "HKD"] as const;
+
+const REMINDER_MODE_OPTIONS = [
+  { value: "daily_from_n_days", label: "自第 n 天起每天通知" },
+  { value: "once_on_nth_day", label: "仅在第 n 天通知一次" },
+] as const;
+
+export default function SubscriptionFormDialog({
+  open,
+  onOpenChange,
+  subscription,
+  onSuccess,
+}: SubscriptionFormDialogProps) {
+  const isEdit = !!subscription;
+  const [categoryInput, setCategoryInput] = useState("");
+
+  const form = useForm<FormInput, unknown, FormOutput>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      name: "",
+      category: "other",
+      url: "",
+      notes: "",
+      cost: undefined,
+      currency: "CNY",
+      billingCycle: "yearly",
+      billingCycleCount: 1,
+      autoRenew: false,
+      startDate: "",
+      expireDate: "",
+      reminderDays: 7,
+      reminderMode: "daily_from_n_days",
+      status: "active",
+    },
+  });
+
+  const { handleSubmit, reset, setValue, watch, control, formState: { isSubmitting } } = form;
+
+  const billingCycle = watch("billingCycle");
+  const billingCycleCount = watch("billingCycleCount");
+  const startDate = watch("startDate");
+  const category = watch("category");
+  const currency = watch("currency");
+  const status = watch("status");
+  const reminderMode = watch("reminderMode");
+
+  useEffect(() => {
+    if (billingCycle !== "once" && startDate) {
+      const computed = calcExpireDateFromStartDate(startDate, billingCycle, billingCycleCount ?? 1);
+      if (computed) setValue("expireDate", computed);
+    }
+  }, [billingCycle, billingCycleCount, startDate, setValue]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    if (subscription) {
+      const cat = subscription.category;
+      setCategoryInput(PRESET_CATEGORIES.find((item) => item.value === cat) ? "" : cat);
+      reset({
+        name: subscription.name,
+        category: cat,
+        url: subscription.url ?? "",
+        notes: subscription.notes ?? "",
+        cost: subscription.cost ?? undefined,
+        currency: subscription.currency,
+        billingCycle: subscription.billingCycle,
+        billingCycleCount: subscription.billingCycleCount,
+        autoRenew: subscription.autoRenew,
+        startDate: toDateInput(subscription.startDate),
+        expireDate: toDateInput(subscription.expireDate),
+        reminderDays: subscription.reminderDays,
+        reminderMode: subscription.reminderMode,
+        status: subscription.status,
+      });
+      return;
+    }
+
+    setCategoryInput("");
+    reset({
+      name: "",
+      category: "other",
+      url: "",
+      notes: "",
+      cost: undefined,
+      currency: "CNY",
+      billingCycle: "yearly",
+      billingCycleCount: 1,
+      autoRenew: false,
+      startDate: "",
+      expireDate: "",
+      reminderDays: 7,
+      reminderMode: "daily_from_n_days",
+      status: "active",
+    });
+  }, [open, subscription, reset]);
+
+  const onSubmit = async (data: FormOutput) => {
+    try {
+      const url = isEdit ? `/api/subscriptions/${subscription!.id}` : "/api/subscriptions";
+      const method = isEdit ? "PUT" : "POST";
+
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...data,
+          cost: data.cost ?? null,
+          reminderDays: Number(data.reminderDays),
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json() as { error: string };
+        toast.error(typeof err.error === "string" ? err.error : "操作失败");
+        return;
+      }
+
+      const savedSubscription = await res.json() as Subscription;
+      toast.success(isEdit ? "已更新" : "已添加");
+      onSuccess(savedSubscription);
+    } catch {
+      toast.error("网络错误");
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="overflow-hidden p-0">
+        <div className="max-h-[90vh] overflow-y-auto p-4">
+          <DialogHeader>
+            <DialogTitle>{isEdit ? "编辑订阅" : "新增订阅"}</DialogTitle>
+          </DialogHeader>
+
+          <Form {...form}>
+            <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 gap-4 pt-2 sm:grid-cols-2">
+              <FormField
+                control={control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>名称 *</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="例：阿里云" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={control}
+                name="category"
+                render={() => (
+                  <FormItem>
+                    <FormLabel>分类</FormLabel>
+                    <Select
+                      value={categoryInput !== "" ? "__custom__" : (category || "other")}
+                      onValueChange={(value) => {
+                        if (value === "__custom__") {
+                          setCategoryInput(" ");
+                          setValue("category", "", { shouldValidate: true });
+                          return;
+                        }
+                        setCategoryInput("");
+                        setValue("category", value, { shouldValidate: true });
+                      }}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {PRESET_CATEGORIES.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
+                        ))}
+                        <SelectItem value="__custom__">自定义...</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {categoryInput !== "" && (
+                      <FormControl>
+                        <Input
+                          className="mt-2"
+                          placeholder="输入自定义分类"
+                          value={categoryInput.trim()}
+                          autoFocus
+                          onChange={(event) => {
+                            const value = event.target.value;
+                            setCategoryInput(value || " ");
+                            setValue("category", value.trim(), { shouldValidate: true });
+                          }}
+                        />
+                      </FormControl>
+                    )}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={control}
+                name="billingCycle"
+                render={() => (
+                  <FormItem>
+                    <FormLabel>计费周期</FormLabel>
+                    <div className="flex gap-2">
+                      <Select
+                        value={billingCycle}
+                        onValueChange={(value) => setValue("billingCycle", value as FormInput["billingCycle"], { shouldValidate: true })}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="flex-1">
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="daily">天</SelectItem>
+                          <SelectItem value="monthly">月付</SelectItem>
+                          <SelectItem value="quarterly">季付</SelectItem>
+                          <SelectItem value="yearly">年付</SelectItem>
+                          <SelectItem value="once">一次性</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {billingCycle !== "once" && (
+                        <FormField
+                          control={control}
+                          name="billingCycleCount"
+                          render={({ field }) => (
+                            <FormControl>
+                              <Input
+                                type="number"
+                                className="w-20"
+                                min={1}
+                                placeholder="1"
+                                value={field.value ?? ""}
+                                onChange={(event) => field.onChange(event.target.value === "" ? undefined : Number(event.target.value))}
+                              />
+                            </FormControl>
+                          )}
+                        />
+                      )}
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={control}
+                name="startDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>开始日期</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} value={field.value ?? ""} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={control}
+                name="expireDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>到期日期 *</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} value={field.value ?? ""} />
+                    </FormControl>
+                    {billingCycle !== "once" && startDate && (
+                      <FormDescription>已根据开始日期自动计算</FormDescription>
+                    )}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={control}
+                name="autoRenew"
+                render={({ field }) => (
+                  <FormItem>
+                    <div className="flex items-center gap-2 pt-8">
+                      <FormControl>
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-input"
+                          checked={field.value}
+                          onChange={(event) => field.onChange(event.target.checked)}
+                          disabled={billingCycle === "once"}
+                        />
+                      </FormControl>
+                      <FormLabel className="font-normal">自动续期</FormLabel>
+                    </div>
+                    <FormDescription>
+                      {billingCycle === "once" ? "一次性订阅不支持自动续期" : "到期后自动顺延到期日"}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={control}
+                name="cost"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>费用</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={field.value ?? ""}
+                        onChange={(event) => field.onChange(event.target.value === "" ? undefined : Number(event.target.value))}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={control}
+                name="currency"
+                render={() => (
+                  <FormItem>
+                    <FormLabel>货币</FormLabel>
+                    <Select value={currency} onValueChange={(value) => setValue("currency", value, { shouldValidate: true })}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {CURRENCY_OPTIONS.map((item) => (
+                          <SelectItem key={item} value={item}>{item}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={control}
+                name="reminderDays"
+                render={({ field }) => (
+                  <FormItem className="self-start">
+                    <FormLabel>提前提醒（天）</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={365}
+                        value={field.value}
+                        onChange={(event) => {
+                          const value = event.target.value;
+                          field.onChange(value === "" ? "" : Number(value));
+                        }}
+                      />
+                    </FormControl>
+                    <FormDescription>填 0 表示到期当天提醒</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={control}
+                name="reminderMode"
+                render={() => (
+                  <FormItem className="self-start">
+                    <FormLabel>提醒方式</FormLabel>
+                    <Select value={reminderMode} onValueChange={(value) => setValue("reminderMode", value as FormInput["reminderMode"], { shouldValidate: true })}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {REMINDER_MODE_OPTIONS.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      {reminderMode === "daily_from_n_days"
+                        ? "从提前第 n 天开始，到到期当天为止每天按照通知时间段通知"
+                        : "仅在距离到期还剩第 n 天时按照通知时间段通知"}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={control}
+                name="status"
+                render={() => (
+                  <FormItem>
+                    <FormLabel>状态</FormLabel>
+                    <Select value={status} onValueChange={(value) => setValue("status", value as FormInput["status"], { shouldValidate: true })}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {STATUS_OPTIONS.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={control}
+                name="url"
+                render={({ field }) => (
+                  <FormItem className="sm:col-span-2">
+                    <FormLabel>网址</FormLabel>
+                    <FormControl>
+                      <Input {...field} value={field.value ?? ""} placeholder="https://..." />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem className="sm:col-span-2">
+                    <FormLabel>备注</FormLabel>
+                    <FormControl>
+                      <Textarea {...field} value={field.value ?? ""} rows={3} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="flex justify-end gap-2 pt-2 sm:col-span-2">
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>取消</Button>
+                <Button type="submit" disabled={isSubmitting || (billingCycle !== "once" && !billingCycleCount)}>
+                  {isSubmitting ? "保存中..." : "保存"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
