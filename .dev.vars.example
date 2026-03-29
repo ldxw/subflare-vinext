@@ -1,5 +1,4 @@
 # Load .env.development* files when running `wrangler dev`
-NEXTJS_ENV=development
 // 系统登录账户(仅开发时填写)
 USERNAME=
 PASSWORD=
