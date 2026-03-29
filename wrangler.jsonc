@@ -12,7 +12,7 @@
 	"main": "worker/worker.ts",
 	// "main": "vinext/server/app-router-entry",
 	"keep_vars": true,
-	"compatibility_date": "2026-02-28",
+	"compatibility_date": "2026-03-29",
 	"compatibility_flags": [
 		"nodejs_compat",
 		"global_fetch_strictly_public"
@@ -22,14 +22,6 @@
 		// see https://opennext.js.org/cloudflare/howtos/image
 		"binding": "IMAGES"
 	},
-	"services": [
-		{
-			// Self-reference service binding, the service name must match the worker name
-			// see https://opennext.js.org/cloudflare/caching
-			"binding": "WORKER_SELF_REFERENCE",
-			"service": "subflare-vinext"
-		}
-	],
 	"observability": {
 		"enabled": true
 	},

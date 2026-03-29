@@ -1,13 +1,15 @@
 # Subflare
 
-Subflare 是一个运行在 Cloudflare Workers 上的订阅到期提醒管理应用，基于 Next.js 16、OpenNext、Cloudflare D1、Cloudflare KV 和 Drizzle ORM 构建
+Subflare 是一个运行在 Cloudflare Workers 上的订阅到期提醒管理应用，基于 Next.js 16, [vinext](https://blog.cloudflare.com/vinext/), shadcn-ui和 Drizzle ORM 构建
 
 它用于集中管理各类订阅项目，跟踪到期时间、记录续费历史，并通过可扩展的通知渠道发送到期提醒
+
+(其实我还写了个基于[Opennext](https://opennext.js.org/cloudflare)的版本, 但是它的`getCloudflareContext()` 函数貌似有点问题, 导致cron任务获取DB时会报错, 折腾了好久都不行就暂时把仓库private了, 等后续Opennext修复了再open出来)
 
 ## 部署到 Cloudflare Worker
 ### 方案A: 点击图标快速部署 (推荐)
 #### 1. 点击图标, 按照引导页完成部署  
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/Merack/subflare)
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/Merack/subflare-vinext)
 
 #### 2. 设置系统登录账户
 找到部署的[Cloudflare Worker](https://dash.cloudflare.com/), 在设置页里设置变量和机密:
@@ -20,7 +22,7 @@ Subflare 是一个运行在 Cloudflare Workers 上的订阅到期提醒管理应
 #### 1. clone 代码并安装依赖
 
 ```
-git clone https://github.com/Merack/subflare.git
+git clone https://github.com/Merack/subflare-vinext.git
 cd subflare
 pnpm install
 ```
@@ -76,7 +78,7 @@ pnpm deploy
 
 - Next.js 16（App Router）
 - React 19
-- OpenNext for Cloudflare
+- Vinext
 - Cloudflare Workers
 - Cloudflare D1
 - Cloudflare KV
@@ -115,16 +117,6 @@ drizzle.config.ts          # Drizzle 远程 D1 配置
  - Telegram
  - webhook
 
-## 注意!
-
-这个项目不是传统的 Node.js 服务端部署方式
-
-Subflare 使用 OpenNext 将 Next.js 构建产物适配到 Cloudflare Workers，最终运行在 Cloudflare Worker 环境中应用使用：
-
-- D1 存储订阅、通知事件、用户设置等业务数据
-- KV 存储登录会话
-- Worker Cron 事件触发定时提醒任务
-
 ## 本地开发
 
 ### 安装依赖
@@ -142,8 +134,8 @@ pnpm install
 
 其中：
 
-- `.env.development` 主要用于 `drizzle.config.ts` 读取 Cloudflare 远程 D1 信息以及系统登录账户环境变量设置
-- `.dev.vars` 用于 `wrangler dev` / OpenNext Cloudflare 本地运行时变量
+- `.env.development` 主要用于 `drizzle.config.ts` 读取 Cloudflare 远程 D1 信息
+- `.dev.vars` 用于本地运行时变量
 
 ### 初始化本地数据库
 
