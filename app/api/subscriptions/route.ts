@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/db";
 import { subscriptions, REMINDER_MODES } from "@/db/schema";
+import { addBillingCycleCountIssue, BILLING_CYCLE_VALUES, normalizeAutoRenew, normalizeBillingCycleCount } from "@/lib/subscription-billing";
 import { requireApiAuth } from "@/lib/session";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
@@ -12,16 +13,18 @@ const subscriptionSchema = z.object({
   category: z.string().min(1),                              // 类别，必填
   url: z.string().optional(),                               // 相关链接，选填
   notes: z.string().optional(),                             // 备注，选填
-  cost: z.number().nonnegative().optional(),                // 费用，不能为负数，选填
+  cost: z.number().nonnegative().nullable().optional(),      // 费用，不能为负数，选填
   currency: z.string().default("CNY"),                      // 货币，默认为人民币
-  billingCycle: z.enum(["daily", "monthly", "quarterly", "yearly", "once"]), // 计费周期
-  billingCycleCount: z.number().int().min(1).default(1),    // 周期乘数，最少为1
+  billingCycle: z.enum(BILLING_CYCLE_VALUES), // 计费周期
+  billingCycleCount: z.number().int().min(1).optional(),    // 周期乘数，非一次性时必填
   autoRenew: z.boolean().default(false),                    // 是否自动续费
   startDate: z.string().optional(),                         // 开始时间 (ISO 字符串格式)
   expireDate: z.string(),                                   // 到期时间 (ISO 字符串格式)，必填
   reminderDays: z.number().int().min(0).max(365).default(7),// 提前几天提醒，限制 0~365 天内，0 表示当天提醒
   reminderMode: z.enum(REMINDER_MODES).default("daily_from_n_days"),
   status: z.enum(["active", "paused", "disabled", "expired"]).default("active"), // 当前状态
+}).superRefine((data, ctx) => {
+  addBillingCycleCountIssue(data, ctx, "非一次性订阅必须提供计费周期次数");
 });
 
 // ============================================================================
@@ -75,6 +78,8 @@ export async function POST(request: NextRequest) {
       url: data.url || null,
       notes: data.notes || null,
       cost: data.cost ?? null,
+      autoRenew: normalizeAutoRenew(data),
+      billingCycleCount: normalizeBillingCycleCount(data),
       // 将字符串格式的日期转换为 Date 对象
       startDate: data.startDate ? new Date(data.startDate) : null,
       expireDate: new Date(data.expireDate),

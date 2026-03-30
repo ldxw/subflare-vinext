@@ -12,6 +12,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/db";
 import { subscriptions, REMINDER_MODES } from "@/db/schema";
+import { addBillingCycleCountIssue, BILLING_CYCLE_VALUES, normalizeAutoRenew, normalizeBillingCycleCount } from "@/lib/subscription-billing";
 import { requireApiAuth } from "@/lib/session";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
@@ -35,7 +36,7 @@ const updateSchema = z.object({
   /** 货币类型 */
   currency: z.string().optional(),
   /** 计费周期：日/月/季/年/一次性 */
-  billingCycle: z.enum(["daily", "monthly", "quarterly", "yearly", "once"]).optional(),
+  billingCycle: z.enum(BILLING_CYCLE_VALUES).optional(),
   /** 计费周期次数，最小值为 1 */
   billingCycleCount: z.number().int().min(1).optional(),
   /** 是否自动续费 */
@@ -49,6 +50,16 @@ const updateSchema = z.object({
   reminderMode: z.enum(REMINDER_MODES).optional(),
   /** 订阅状态：活跃/暂停/禁用/已过期 */
   status: z.enum(["active", "paused", "disabled", "expired"]).optional(),
+}).superRefine((data, ctx) => {
+  if (!data.billingCycle) return;
+  addBillingCycleCountIssue(
+    {
+      billingCycle: data.billingCycle,
+      billingCycleCount: data.billingCycleCount,
+    },
+    ctx,
+    "非一次性订阅必须提供计费周期次数"
+  );
 });
 
 /**
@@ -129,6 +140,17 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
   // 构建更新数据，自动设置更新时间
   const updateData: Record<string, unknown> = { ...data, updatedAt: new Date() };
+
+  if (data.billingCycle !== undefined) {
+    updateData.billingCycleCount = normalizeBillingCycleCount({
+      billingCycle: data.billingCycle,
+      billingCycleCount: data.billingCycleCount,
+    });
+    updateData.autoRenew = normalizeAutoRenew({
+      billingCycle: data.billingCycle,
+      autoRenew: data.autoRenew,
+    });
+  }
 
   // 处理日期字段：将字符串转换为 Date 对象
   if (data.startDate !== undefined) {

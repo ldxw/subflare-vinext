@@ -18,9 +18,11 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  useFormField,
 } from "@/components/ui/form";
 import type { Subscription } from "@/db/schema";
 import { BILLING_CYCLES, REMINDER_MODES, SUBSCRIPTION_STATUSES } from "@/db/schema";
+import { normalizeAutoRenew } from "@/lib/subscription-billing";
 import { calcExpireDateFromStartDate, toDateInput } from "@/lib/subscription-utils";
 
 const formSchema = z.object({
@@ -31,7 +33,7 @@ const formSchema = z.object({
   cost: z.number().nonnegative().optional(),
   currency: z.string().min(1),
   billingCycle: z.enum(BILLING_CYCLES),
-  billingCycleCount: z.number().int().min(1),
+  billingCycleCount: z.union([z.literal(""), z.number().int().min(1)]),
   autoRenew: z.boolean(),
   startDate: z.string().optional(),
   expireDate: z.string().min(1, "请选择到期日期"),
@@ -41,10 +43,38 @@ const formSchema = z.object({
   ]).refine((value) => value !== "", "请输入提醒天数"),
   reminderMode: z.enum(REMINDER_MODES),
   status: z.enum(SUBSCRIPTION_STATUSES),
-});
+}).superRefine((data, ctx) => {
+  if (data.billingCycle !== "once" && data.billingCycleCount === "") {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["billingCycleCount"],
+      message: "请输入计费周期次数",
+    });
+  }
+}).transform((data) => ({
+  ...data,
+  billingCycleCount: data.billingCycle === "once" ? 1 : data.billingCycleCount,
+}));
 
 type FormInput = z.input<typeof formSchema>;
 type FormOutput = z.output<typeof formSchema>;
+
+const createDefaultValues: FormInput = {
+  name: "",
+  category: "other",
+  url: "",
+  notes: "",
+  cost: undefined,
+  currency: "CNY",
+  billingCycle: "yearly",
+  billingCycleCount: 1,
+  autoRenew: false,
+  startDate: "",
+  expireDate: "",
+  reminderDays: 7,
+  reminderMode: "daily_from_n_days",
+  status: "active",
+};
 
 interface SubscriptionFormDialogProps {
   open: boolean;
@@ -77,6 +107,14 @@ const REMINDER_MODE_OPTIONS = [
   { value: "once_on_nth_day", label: "仅在第 n 天通知一次" },
 ] as const;
 
+function BillingCycleCountError({ message }: { message?: string }) {
+  const { formMessageId } = useFormField();
+
+  if (!message) return null;
+
+  return <p id={formMessageId} className="text-destructive text-sm">{message}</p>;
+}
+
 export default function SubscriptionFormDialog({
   open,
   onOpenChange,
@@ -88,25 +126,10 @@ export default function SubscriptionFormDialog({
 
   const form = useForm<FormInput, unknown, FormOutput>({
     resolver: zodResolver(formSchema),
-    defaultValues: {
-      name: "",
-      category: "other",
-      url: "",
-      notes: "",
-      cost: undefined,
-      currency: "CNY",
-      billingCycle: "yearly",
-      billingCycleCount: 1,
-      autoRenew: false,
-      startDate: "",
-      expireDate: "",
-      reminderDays: 7,
-      reminderMode: "daily_from_n_days",
-      status: "active",
-    },
+    defaultValues: createDefaultValues,
   });
 
-  const { handleSubmit, reset, setValue, watch, control, formState: { isSubmitting } } = form;
+  const { handleSubmit, reset, setValue, watch, control, getFieldState, formState, formState: { isSubmitting } } = form;
 
   const billingCycle = watch("billingCycle");
   const billingCycleCount = watch("billingCycleCount");
@@ -115,12 +138,27 @@ export default function SubscriptionFormDialog({
   const currency = watch("currency");
   const status = watch("status");
   const reminderMode = watch("reminderMode");
+  const billingCycleCountError = getFieldState("billingCycleCount", formState).error?.message;
 
   useEffect(() => {
-    if (billingCycle !== "once" && startDate) {
-      const computed = calcExpireDateFromStartDate(startDate, billingCycle, billingCycleCount ?? 1);
-      if (computed) setValue("expireDate", computed);
+    if (billingCycle === "once") {
+      setValue("autoRenew", false, { shouldDirty: true });
+      return;
     }
+
+    if (!startDate || typeof billingCycleCount !== "number") {
+      return;
+    }
+
+    const computed = calcExpireDateFromStartDate(startDate, billingCycle, billingCycleCount);
+    if (!computed) {
+      return;
+    }
+
+    setValue("expireDate", computed, {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
   }, [billingCycle, billingCycleCount, startDate, setValue]);
 
   useEffect(() => {
@@ -149,22 +187,7 @@ export default function SubscriptionFormDialog({
     }
 
     setCategoryInput("");
-    reset({
-      name: "",
-      category: "other",
-      url: "",
-      notes: "",
-      cost: undefined,
-      currency: "CNY",
-      billingCycle: "yearly",
-      billingCycleCount: 1,
-      autoRenew: false,
-      startDate: "",
-      expireDate: "",
-      reminderDays: 7,
-      reminderMode: "daily_from_n_days",
-      status: "active",
-    });
+    reset(createDefaultValues);
   }, [open, subscription, reset]);
 
   const onSubmit = async (data: FormOutput) => {
@@ -172,14 +195,17 @@ export default function SubscriptionFormDialog({
       const url = isEdit ? `/api/subscriptions/${subscription!.id}` : "/api/subscriptions";
       const method = isEdit ? "PUT" : "POST";
 
+      const payload = {
+        ...data,
+        autoRenew: normalizeAutoRenew(data),
+        cost: data.cost ?? null,
+        reminderDays: Number(data.reminderDays),
+      };
+
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...data,
-          cost: data.cost ?? null,
-          reminderDays: Number(data.reminderDays),
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
@@ -299,20 +325,24 @@ export default function SubscriptionFormDialog({
                           control={control}
                           name="billingCycleCount"
                           render={({ field }) => (
-                            <FormControl>
-                              <Input
-                                type="number"
-                                className="w-20"
-                                min={1}
-                                placeholder="1"
-                                value={field.value ?? ""}
-                                onChange={(event) => field.onChange(event.target.value === "" ? undefined : Number(event.target.value))}
-                              />
-                            </FormControl>
+                            <FormItem>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  className="w-20"
+                                  min={1}
+                                  placeholder="1"
+                                  value={field.value}
+                                  aria-invalid={!!billingCycleCountError}
+                                  onChange={(event) => field.onChange(event.target.value === "" ? "" : Number(event.target.value))}
+                                />
+                              </FormControl>
+                            </FormItem>
                           )}
                         />
                       )}
                     </div>
+                    <BillingCycleCountError message={billingCycleCountError} />
                     <FormMessage />
                   </FormItem>
                 )}
@@ -522,7 +552,7 @@ export default function SubscriptionFormDialog({
 
               <div className="flex justify-end gap-2 pt-2 sm:col-span-2">
                 <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>取消</Button>
-                <Button type="submit" disabled={isSubmitting || (billingCycle !== "once" && !billingCycleCount)}>
+                <Button type="submit" disabled={isSubmitting}>
                   {isSubmitting ? "保存中..." : "保存"}
                 </Button>
               </div>
