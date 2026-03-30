@@ -50,11 +50,6 @@ const renewSchema = z.object({
  * // 请求: GET /api/subscriptions/123/history
  * // 响应: [{ id: 1, subscriptionId: 123, renewalType: "manual", ... }, ...]
  *
- * 流程:
- * 1. 验证用户身份
- * 2. 查询订阅是否存在且属于当前用户
- * 3. 查询该订阅的所有续费历史记录
- * 4. 按创建时间倒序返回结果
  */
 export async function GET(_request: NextRequest, { params }: RouteParams) {
   // 验证用户登录状态
@@ -99,13 +94,6 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
  * // 请求体: { newExpireDate: "2025-12-31", cost: 99.99, notes: "年度续费" }
  * // 响应: { id: 1, subscriptionId: 123, renewalType: "manual", ... }
  *
- * 流程:
- * 1. 验证用户身份
- * 2. 验证请求体数据格式
- * 3. 查询订阅是否存在且属于当前用户
- * 4. 创建续费历史记录
- * 5. 更新订阅的过期日期和状态
- * 6. 返回新创建的续费记录
  */
 export async function POST(request: NextRequest, { params }: RouteParams) {
   // 验证用户登录状态

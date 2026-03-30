@@ -241,6 +241,7 @@ Claude, ChatGPT
 ## 参考
 
 - OpenNext for Cloudflare: https://opennext.js.org/cloudflare
+- Vinext: https://github.com/cloudflare/vinext
 - Next.js: https://nextjs.org
 - Cloudflare Workers: https://developers.cloudflare.com/workers/
 - Cloudflare D1: https://developers.cloudflare.com/d1/
