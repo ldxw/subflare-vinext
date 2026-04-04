@@ -1,6 +1,7 @@
 import type { NotificationStrategy } from "./types";
 import { TelegramStrategy } from "./telegram";
 import { WebhookStrategy } from "./webhook";
+import { WecomBotStrategy } from "./wecombot";
 
 class StrategyRegistry {
   private readonly strategies = new Map<string, NotificationStrategy>();
@@ -17,3 +18,4 @@ class StrategyRegistry {
 export const registry = new StrategyRegistry();
 registry.register(new TelegramStrategy());
 registry.register(new WebhookStrategy());
+registry.register(new WecomBotStrategy());

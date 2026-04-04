@@ -2,6 +2,7 @@ import { CHANNEL_TYPES, type ChannelType } from "@/db/schema";
 import type { NotificationChannelDescriptor } from "./types";
 import { TelegramStrategy } from "./telegram";
 import { getWebhookSummary, validateWebhookConfig } from "./webhook";
+import { getWecomBotSummary, validateWecomBotConfig } from "./wecombot";
 
 function maskMiddle(value: string, left = 2, right = 2): string {
   if (value.length <= left + right) return value;
@@ -93,9 +94,32 @@ const webhookDescriptor: NotificationChannelDescriptor = {
   },
 };
 
+const wecomBotDescriptor: NotificationChannelDescriptor = {
+  type: "wecombot",
+  label: "WeCom Bot",
+  namePlaceholder: "我的企业微信机器人",
+  fields: [
+    {
+      key: "webhookUrl",
+      label: "Webhook URL",
+      placeholder: "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=...",
+      requiredOnCreate: true,
+      allowBlankOnEdit: true,
+      description: "请输入企业微信机器人 Webhook URL. 编辑时留空表示保持原值不变.",
+    },
+  ],
+  validateConfig(config) {
+    return validateWecomBotConfig(config);
+  },
+  getSummary(config) {
+    return getWecomBotSummary(config);
+  },
+};
+
 export const channelDescriptors: Record<ChannelType, NotificationChannelDescriptor> = {
   telegram: telegramDescriptor,
   webhook: webhookDescriptor,
+  wecombot: wecomBotDescriptor,
 };
 
 export function getChannelDescriptor(type: string): NotificationChannelDescriptor | undefined {
