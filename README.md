@@ -133,6 +133,7 @@ drizzle.config.ts          # Drizzle 远程 D1 配置
  - wecombot(企业微信机器人)
  - bark
  - notifyx
+ - resend
 
 贡献通知渠道: [new_channel.md](doc/new_channel.md)
 

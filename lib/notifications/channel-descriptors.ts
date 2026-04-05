@@ -5,6 +5,7 @@ import { getWebhookSummary, validateWebhookConfig } from "./webhook";
 import { getWecomBotSummary, validateWecomBotConfig } from "./wecombot";
 import { getBarkSummary, validateBarkConfig } from "./bark";
 import { getNotifyXSummary, validateNotifyXConfig } from "./notifyx";
+import { getResendSummary, validateResendConfig } from "./resend";
 
 function maskMiddle(value: string, left = 2, right = 2): string {
   if (value.length <= left + right) return value;
@@ -172,12 +173,52 @@ const notifyXDescriptor: NotificationChannelDescriptor = {
   },
 };
 
+const resendDescriptor: NotificationChannelDescriptor = {
+  type: "resend",
+  label: "Resend",
+  namePlaceholder: "我的 Resend",
+  fields: [
+    {
+      key: "apiKey",
+      label: "API Key",
+      placeholder: "re_xxxxxxxxxxxxxxxxxxxxxxxx",
+      requiredOnCreate: true,
+      allowBlankOnEdit: true,
+      inputType: "password",
+      description: "请输入 Resend API Key. 编辑时留空表示保持原值不变.",
+    },
+    {
+      key: "from",
+      label: "From",
+      placeholder: "notice@example.com",
+      requiredOnCreate: true,
+      allowBlankOnEdit: true,
+      description: "必须在 Resend 后台验证发件域",
+    },
+    {
+      key: "to",
+      label: "To",
+      placeholder: "user@example.com",
+      requiredOnCreate: true,
+      allowBlankOnEdit: true,
+      description: "请输入接收通知的邮箱地址. 编辑时留空表示保持原值不变.",
+    },
+  ],
+  validateConfig(config) {
+    return validateResendConfig(config);
+  },
+  getSummary(config) {
+    return getResendSummary(config);
+  },
+};
+
 export const channelDescriptors: Record<ChannelType, NotificationChannelDescriptor> = {
   telegram: telegramDescriptor,
   webhook: webhookDescriptor,
   wecombot: wecomBotDescriptor,
   bark: barkDescriptor,
   notifyx: notifyXDescriptor,
+  resend: resendDescriptor,
 };
 
 export function getChannelDescriptor(type: string): NotificationChannelDescriptor | undefined {
