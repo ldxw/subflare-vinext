@@ -4,6 +4,7 @@ import { TelegramStrategy } from "./telegram";
 import { getWebhookSummary, validateWebhookConfig } from "./webhook";
 import { getWecomBotSummary, validateWecomBotConfig } from "./wecombot";
 import { getBarkSummary, validateBarkConfig } from "./bark";
+import { getNotifyXSummary, validateNotifyXConfig } from "./notifyx";
 
 function maskMiddle(value: string, left = 2, right = 2): string {
   if (value.length <= left + right) return value;
@@ -148,11 +149,35 @@ const barkDescriptor: NotificationChannelDescriptor = {
   },
 };
 
+const notifyXDescriptor: NotificationChannelDescriptor = {
+  type: "notifyx",
+  label: "NotifyX",
+  namePlaceholder: "我的 NotifyX",
+  fields: [
+    {
+      key: "apiKey",
+      label: "API Key",
+      placeholder: "xxxxxxxxxxxxxxxxxxxxxxxx",
+      requiredOnCreate: true,
+      allowBlankOnEdit: true,
+      inputType: "password",
+      description: "请输入 NotifyX API Key. 编辑时留空表示保持原值不变.",
+    },
+  ],
+  validateConfig(config) {
+    return validateNotifyXConfig(config);
+  },
+  getSummary(config) {
+    return getNotifyXSummary(config);
+  },
+};
+
 export const channelDescriptors: Record<ChannelType, NotificationChannelDescriptor> = {
   telegram: telegramDescriptor,
   webhook: webhookDescriptor,
   wecombot: wecomBotDescriptor,
   bark: barkDescriptor,
+  notifyx: notifyXDescriptor,
 };
 
 export function getChannelDescriptor(type: string): NotificationChannelDescriptor | undefined {

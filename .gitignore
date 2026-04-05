@@ -56,6 +56,7 @@ skills-lock.json
 .claude
 .omc
 .agents
+.firecrawl
 
 pnpm-lock.yaml
 
