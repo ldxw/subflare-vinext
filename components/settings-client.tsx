@@ -99,10 +99,16 @@ function createEmptyConfig(type: string, mode: "create" | "edit" = "create"): Ch
   if (!descriptor) return {};
 
   return Object.fromEntries(
-    descriptor.fields.map((field) => [
-      field.key,
-      mode === "create" && field.inputType === "select" ? (field.options?.[0]?.value ?? "") : "",
-    ])
+    descriptor.fields.map((field) => {
+      if (mode === "create" && type === "bark" && field.key === "serverUrl") {
+        return [field.key, "https://api.day.app"];
+      }
+
+      return [
+        field.key,
+        mode === "create" && field.inputType === "select" ? (field.options?.[0]?.value ?? "") : "",
+      ];
+    })
   );
 }
 

@@ -131,6 +131,7 @@ drizzle.config.ts          # Drizzle 远程 D1 配置
  - Telegram
  - webhook
  - wecombot(企业微信机器人)
+ - bark
 
 贡献通知渠道: [new_channel.md](doc/new_channel.md)
 

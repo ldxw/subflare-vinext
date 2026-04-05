@@ -3,6 +3,7 @@ import type { NotificationChannelDescriptor } from "./types";
 import { TelegramStrategy } from "./telegram";
 import { getWebhookSummary, validateWebhookConfig } from "./webhook";
 import { getWecomBotSummary, validateWecomBotConfig } from "./wecombot";
+import { getBarkSummary, validateBarkConfig } from "./bark";
 
 function maskMiddle(value: string, left = 2, right = 2): string {
   if (value.length <= left + right) return value;
@@ -116,10 +117,42 @@ const wecomBotDescriptor: NotificationChannelDescriptor = {
   },
 };
 
+const barkDescriptor: NotificationChannelDescriptor = {
+  type: "bark",
+  label: "Bark",
+  namePlaceholder: "我的 Bark",
+  fields: [
+    {
+      key: "serverUrl",
+      label: "Server URL",
+      placeholder: "https://api.day.app",
+      requiredOnCreate: true,
+      allowBlankOnEdit: true,
+      description: "支持官方服务或自建 Bark 服务地址. 编辑时留空表示保持原值不变.",
+    },
+    {
+      key: "deviceKey",
+      label: "Device Key",
+      placeholder: "xxxxxxxxxxxxxxxxxxxxxxxx",
+      requiredOnCreate: true,
+      allowBlankOnEdit: true,
+      inputType: "password",
+      description: "请输入 Bark 设备 Key. 编辑时留空表示保持原值不变.",
+    },
+  ],
+  validateConfig(config) {
+    return validateBarkConfig(config);
+  },
+  getSummary(config) {
+    return getBarkSummary(config);
+  },
+};
+
 export const channelDescriptors: Record<ChannelType, NotificationChannelDescriptor> = {
   telegram: telegramDescriptor,
   webhook: webhookDescriptor,
   wecombot: wecomBotDescriptor,
+  bark: barkDescriptor,
 };
 
 export function getChannelDescriptor(type: string): NotificationChannelDescriptor | undefined {
