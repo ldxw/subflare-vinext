@@ -48,7 +48,6 @@ pnpm install
 #### 3. 修改配置文件
 
 (i) `wrangler.jsonc`主要修改以下字段:
- - services: 保证其内部`service`名与`name`字段相同
  - d1_databases
  - kv_namespaces
 
@@ -128,11 +127,13 @@ drizzle.config.ts          # Drizzle 远程 D1 配置
 ```
 
 ## 通知渠道
- - Telegram
+ - Telegram: [@botfather](https://t.me/BotFather)
  - webhook
- - wecombot(企业微信机器人)
- - bark
- - notifyx
+ - wecombot(企业微信机器人): [https://developer.work.weixin.qq.com](https://developer.work.weixin.qq.com/document/path/91770)
+ - bark: [https://bark.day.app](https://bark.day.app/#/?id=bark)
+ - notifyx: [https://www.notifyx.cn/help](https://www.notifyx.cn/help)
+ - resend: [https://resend.com](https://resend.com/api-keys)
+ - smtp
 
 贡献通知渠道: [new_channel.md](doc/new_channel.md)
 
@@ -228,6 +229,9 @@ pnpm cf-typegen # 生成 Cloudflare 环境类型
 ### 新增通知渠道
 示例代码详见: [new_channel.md](doc/new_channel.md)
 
+#### 需要特别注意
+- 在本地开发环境下smtp无法正常解析smtp host, 还不清楚什么原因, 如果要对smtp进行相关开发, 请部署到worker环境上验证
+
 ### 用户系统设计
 
 - 登录会话基于 Cloudflare KV 实现
@@ -235,8 +239,14 @@ pnpm cf-typegen # 生成 Cloudflare 环境类型
 - `src/lib/session.ts` 中将用户固定为单用户上下文处理
 
 ## 待完善计划
- - API错误提示
- - 数据导出
+ - 后端API错误提示
+ - 农历
+ - 数据备份
+ - 订阅排序模式
+ - ISR缓存优化
+ - 消息发送历史查询
+ - 自定义发送信息文本
+ - 数据库清理(消息发送记录表, 清除过期>一定时间范围的订阅)
 
 ## 致谢
 Claude, ChatGPT
