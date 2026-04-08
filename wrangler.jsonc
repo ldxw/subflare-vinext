@@ -29,14 +29,14 @@
 		{
 			"binding": "DB",
 			// "database_name": "subflare-vinext",
-			"database_id": "ca032790-da0e-46ad-a650-c33dc82053bf",
+			"database_id": "__D1_ID__",
 			"migrations_dir": "drizzle"
 		}
 	],
 	"kv_namespaces": [
 		{
 		  "binding": "KV",
-		  "id": "19ce58a4b90c4cfea0ed238833eeea89"
+		  "id": "__KV_ID__"
 		}
     ],
 	"triggers": {
