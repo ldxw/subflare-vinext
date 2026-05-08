@@ -198,8 +198,8 @@ pnpm install
 先按sql文件名前缀数字顺序执行 `drizzle/` 目录中的 SQL 文件到本地 D1, 如：
 
 ```bash
-pnpm wrangler d1 execute DB --local --file=drizzle/0000_supreme_mister_fear.sql
-pnpm wrangler d1 execute DB --local --file=drizzle/0001_broken_spyke.sql
+pnpm wrangler d1 execute DB --local --file=drizzle/0000_supreme_mister_fear.sql --env development
+pnpm wrangler d1 execute DB --local --file=drizzle/0001_broken_spyke.sql --env development
 ```
 
 如果后续新增了新的 SQL 文件，也需要继续按文件顺序执行
@@ -228,13 +228,13 @@ pnpm drizzle-kit generate
 对本地模拟 D1 生效时，应执行：
 
 ```bash
-pnpm wrangler d1 execute DB --local --file=drizzle/<sql_file_name>.sql
+pnpm wrangler d1 execute DB --local --file=drizzle/<sql_file_name>.sql --env development
 ```
 
 例如：
 
 ```bash
-pnpm wrangler d1 execute DB --local --file=drizzle/0002_xxx.sql
+pnpm wrangler d1 execute DB --local --file=drizzle/0002_xxx.sql --env development
 ```
 
 #### 应用到远程数据库
