@@ -721,7 +721,7 @@ export default function SettingsClient({ initialChannels, initialPreferences }: 
       </Card>
 
       <Dialog open={eventDialogOpen} onOpenChange={setEventDialogOpen}>
-        <DialogContent className="sm:max-w-4xl">
+        <DialogContent className="sm:max-w-4xl max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>最近 50 条发送记录</DialogTitle>
             <DialogDescription>
@@ -731,30 +731,32 @@ export default function SettingsClient({ initialChannels, initialPreferences }: 
           {eventRecords.length === 0 ? (
             <p className="text-sm text-muted-foreground">暂无发送记录</p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>时间</TableHead>
-                  <TableHead>订阅名称</TableHead>
-                  <TableHead>渠道名称</TableHead>
-                  <TableHead>状态</TableHead>
-                  <TableHead>提前天数</TableHead>
-                  <TableHead>错误信息</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {eventRecords.map((record) => (
-                  <TableRow key={record.id}>
-                    <TableCell>{formatEventTime(record.sentAt, record.createdAt)}</TableCell>
-                    <TableCell>{record.subscriptionName}</TableCell>
-                    <TableCell>{record.channelName}</TableCell>
-                    <TableCell>{formatEventStatus(record.status)}</TableCell>
-                    <TableCell>{formatOffsetDays(record.offsetDays)}</TableCell>
-                    <TableCell className="max-w-48 truncate">{record.error || "-"}</TableCell>
+            <div className="overflow-y-auto min-h-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>时间</TableHead>
+                    <TableHead>订阅名称</TableHead>
+                    <TableHead>渠道名称</TableHead>
+                    <TableHead>状态</TableHead>
+                    <TableHead>提前天数</TableHead>
+                    <TableHead>错误信息</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {eventRecords.map((record) => (
+                    <TableRow key={record.id}>
+                      <TableCell>{formatEventTime(record.sentAt, record.createdAt)}</TableCell>
+                      <TableCell>{record.subscriptionName}</TableCell>
+                      <TableCell>{record.channelName}</TableCell>
+                      <TableCell>{formatEventStatus(record.status)}</TableCell>
+                      <TableCell>{formatOffsetDays(record.offsetDays)}</TableCell>
+                      <TableCell className="max-w-48 truncate">{record.error || "-"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </DialogContent>
       </Dialog>
