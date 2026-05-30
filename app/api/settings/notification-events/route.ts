@@ -48,14 +48,15 @@ export async function DELETE(request: NextRequest) {
   const cutoff = new Date();
   cutoff.setMonth(cutoff.getMonth() - parsed.data.months);
 
-  const ids = await db
-    .select({ id: notificationEvents.id })
-    .from(notificationEvents)
-    .innerJoin(subscriptions, eq(notificationEvents.subscriptionId, subscriptions.id))
+  // Use subscription IDs (small count) instead of event IDs (large count)
+  // to avoid exceeding D1's 100 binding parameter limit
+  const userSubs = await db
+    .select({ id: subscriptions.id })
+    .from(subscriptions)
     .where(eq(subscriptions.userId, session.userId));
 
-  const deletableIds = ids.map((item) => item.id);
-  if (deletableIds.length === 0) {
+  const subIds = userSubs.map((s) => s.id);
+  if (subIds.length === 0) {
     return NextResponse.json({ success: true, deletedCount: 0 });
   }
 
@@ -63,7 +64,7 @@ export async function DELETE(request: NextRequest) {
     .delete(notificationEvents)
     .where(
       and(
-        inArray(notificationEvents.id, deletableIds),
+        inArray(notificationEvents.subscriptionId, subIds),
         lt(notificationEvents.createdAt, cutoff)
       )
     )
